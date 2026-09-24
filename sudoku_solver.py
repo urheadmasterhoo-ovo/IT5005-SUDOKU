@@ -225,9 +225,6 @@ def pl_bc_entails(kb, query, trace=None):
     -------
     bool
     """
-    import sys
-    sys.setrecursionlimit(10000)
-
     # Index: conclusion -> [premise list, premise list, ...].
     # Built once per KB and cached on the KB object.
     index = getattr(kb, '_bc_index', None)
@@ -240,25 +237,55 @@ def pl_bc_entails(kb, query, trace=None):
 
     proven = set()   # goals proven True (kept for the whole query)
 
-    def prove(goal, chain, failed):
-        # chain  : goals currently being proved on this path (cycle guard)
-        # failed : goals that could not be proved in this round
-        if goal in proven:
-            return True
-        if goal in chain or goal in failed:
-            return False
+    def prove(query, failed):
+        # Depth-first proof with an explicit stack instead of recursion, so
+        # the proof depth is not limited by Python's recursion limit.
+        # Each frame is [goal, rule_i, premise_i]: which rule for goal we
+        # are on, and which premise of that rule we are proving next.
+        stack = [[query, 0, 0]]
+        chain = {query}          # goals currently on the stack (cycle guard)
+        result = None            # verdict just returned by a finished frame
 
-        deeper = chain | {goal}
-        for premises in index.get(goal, []):
-            # A fact has premises == [] and all([]) is True.
-            if all(prove(p, deeper, failed) for p in premises):
+        while stack:
+            if result is not None:
+                top = stack[-1]
+                if result:
+                    top[2] += 1              # premise proved: next premise
+                else:
+                    top[1] += 1              # premise failed: next rule
+                    top[2] = 0
+                result = None
+
+            goal, ri, pi = stack[-1]
+            rules = index.get(goal, [])
+
+            if ri >= len(rules):             # every rule tried, none worked
+                failed.add(goal)
+                chain.discard(goal)
+                stack.pop()
+                result = False
+                continue
+
+            premises = rules[ri]
+            if pi >= len(premises):          # all premises of this rule hold
                 proven.add(goal)
                 if trace is not None:
                     trace.append({'conclusion': goal, 'premises': list(premises)})
-                return True
+                chain.discard(goal)
+                stack.pop()
+                result = True
+                continue
 
-        failed.add(goal)
-        return False
+            p = premises[pi]
+            if p in proven:
+                result = True
+            elif p in chain or p in failed:
+                result = False
+            else:
+                stack.append([p, 0, 0])
+                chain.add(p)
+
+        return result
 
     # A goal may be marked failed only because a premise hit the cycle
     # guard, while that premise was proved later through another rule.
@@ -266,7 +293,7 @@ def pl_bc_entails(kb, query, trace=None):
     # or a whole round adds nothing new to 'proven'.
     while True:
         before = len(proven)
-        if prove(query, frozenset(), set()):
+        if prove(query, set()):
             return True
         if len(proven) == before:
             return False
