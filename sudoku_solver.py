@@ -196,6 +196,18 @@ def solve_full_grid_fc(n, box_h, box_w, givens):
     dict[(int, int), int] -- {(row, col): value} for every cell
     """
     kb = build_definite_kb(n, box_h, box_w, givens)
+
+    # Map each premise to the rules that use it.
+    premise_index = {}
+
+    for clause in kb.clauses:
+        if clause.op == "==>":
+            for premise in set(conjuncts(clause.args[0])):
+                premise_index.setdefault(premise, []).append(clause)
+
+    # Use the index for this knowledge base.
+    kb.clauses_with_premise = lambda p: premise_index.get(p, [])
+
     grid = dict(givens)
 
     for r in range(1, n + 1):
