@@ -25,13 +25,13 @@ def describe_atom(symbol):
 
     return text
 
-def explain_rule(conclusion, premises, n):
+def explain_rule(conclusion, premises, n, box_h, box_w):
     text = str(conclusion)
 
+    # Rule: only one candidate remains in this cell.
     if text.startswith("Is"):
         r, c, v = map(int, text[2:].split("_"))
 
-        # Check whether every other value has been ruled out
         other_values = [
             value for value in range(1, n + 1)
             if value != v
@@ -48,12 +48,57 @@ def explain_rule(conclusion, premises, n):
             excluded = ", ".join(map(str, other_values))
 
             return (
-                f"Last remaining candidate: "
-                f"values {excluded} have all been ruled out "
-                f"for row {r}, column {c}. "
+                f"Last remaining candidate: values {excluded} "
+                f"have all been ruled out for row {r}, column {c}. "
                 f"Since each cell must contain one value from 1 to {n}, "
                 f"this cell must contain {v}."
             )
+
+    # Elimination rules with one established value as the premise.
+    if text.startswith("Not") and len(premises) == 1:
+        r, c, v = map(int, text[3:].split("_"))
+        premise = str(premises[0])
+
+        if premise.startswith("Is"):
+            pr, pc, pv = map(int, premise[2:].split("_"))
+
+            # Same cell, different value.
+            if r == pr and c == pc and v != pv:
+                return (
+                    f"One value per cell: row {r}, column {c} "
+                    f"already contains {pv}, so it cannot also contain {v}."
+                )
+
+            if v == pv and (r, c) != (pr, pc):
+                # Same row.
+                if r == pr:
+                    return (
+                        f"Row constraint: row {r} already contains {v} "
+                        f"in column {pc}. A number cannot repeat within "
+                        f"a row, so row {r}, column {c} cannot contain {v}."
+                    )
+
+                # Same column.
+                if c == pc:
+                    return (
+                        f"Column constraint: column {c} already contains {v} "
+                        f"in row {pr}. A number cannot repeat within "
+                        f"a column, so row {r}, column {c} cannot contain {v}."
+                    )
+
+                # Same box.
+                same_box = (
+                    (r - 1) // box_h == (pr - 1) // box_h
+                    and (c - 1) // box_w == (pc - 1) // box_w
+                )
+
+                if same_box:
+                    return (
+                        f"Box constraint: row {pr}, column {pc} "
+                        f"already contains {v} in the same box. "
+                        f"A number cannot repeat within a box, "
+                        f"so row {r}, column {c} cannot contain {v}."
+                    )
 
     return f"These premises imply: {describe_atom(conclusion)}."
 
@@ -454,6 +499,8 @@ else:
                                 current_step["conclusion"],
                                 premises,
                                 n,
+                                pool["box_h"],
+                                pool["box_w"],
                             )
                         )
 
@@ -517,5 +564,7 @@ else:
                             step["conclusion"],
                             premises,
                             n,
+                            pool["box_h"],
+                            pool["box_w"],
                         )
                     )
