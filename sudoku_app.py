@@ -101,7 +101,7 @@ st.html("""
     width: 100%;
     max-width: 480px;
     border: 3px solid #475569;
-    margin: 16px 0;
+    margin: 16px auto;
 }
 
 .sudoku-board td {
@@ -208,11 +208,6 @@ algorithm = st.radio(
     index=1,
 )
 
-if algorithm == "Forward chaining":
-    st.warning(
-        "Forward chaining may take tens of minutes or longer "
-        "for a full puzzle with the current solver."
-    )
 
 # Convert JSON keys such as "1_2" into tuples such as (1, 2)
 solver_givens = {
@@ -428,10 +423,7 @@ else:
                 focus=focus,
             )
 
-            st.caption(
-                "Yellow: current cell · Gray / bold: givens · "
-                "Blue: inferred values"
-            )
+            st.caption("Yellow = current step · Gray = given · Blue = inferred")
 
         with reasoning_col:
             with st.container(border=True):
