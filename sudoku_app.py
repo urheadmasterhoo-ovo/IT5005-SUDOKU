@@ -170,7 +170,7 @@ if st.session_state.get("active_puzzle") != puzzle_index:
     st.session_state.pop("query_result", None)
     st.session_state.pop("replay_step", None)
 
-st.write(f"Given cells: {len(givens)}")
+st.caption(f"Given cells: {len(givens)}")
 
 
 # Build the puzzle board
